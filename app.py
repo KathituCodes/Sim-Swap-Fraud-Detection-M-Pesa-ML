@@ -155,7 +155,8 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
     day_tue = 1 if day_of_week == "Tue" else 0
     day_wed = 1 if day_of_week == "Wed" else 0
 
-    # Build feature dict in the exact column order from training
+   # Build feature dict in the EXACT column order from training
+    # Order must match df_clean column list from notebook Cell 54
     features = {
         'amount':                    amount,
         'sender_balance_before':     sender_bal_before,
@@ -163,10 +164,6 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
         'receiver_balance_before':   receiver_bal_before,
         'receiver_balance_after':    receiver_bal_after,
         'hour':                      hour,
-        'balance_depletion_rate':    balance_depletion_rate,
-        'is_high_value':             is_high_value,
-        'is_balance_wipeout':        is_balance_wipeout,
-        'sender_balance_ratio':      sender_balance_ratio,
         'transaction_type_peer':     txn_peer,
         'transaction_type_till':     txn_till,
         'device_type_smartphone':    dev_smartphone,
@@ -180,6 +177,10 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
         'day_of_week_Thu':           day_thu,
         'day_of_week_Tue':           day_tue,
         'day_of_week_Wed':           day_wed,
+        'balance_depletion_rate':    balance_depletion_rate,
+        'is_high_value':             is_high_value,
+        'is_balance_wipeout':        is_balance_wipeout,
+        'sender_balance_ratio':      sender_balance_ratio,
     }
 
     return pd.DataFrame([features]), {
