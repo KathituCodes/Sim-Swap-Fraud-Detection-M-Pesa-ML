@@ -3,7 +3,6 @@ import joblib
 import pickle
 import numpy as np
 import pandas as pd
-import scorecardpy as sc
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
@@ -194,19 +193,55 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
 def prepare_woe_input(amount, sender_bal_before, sender_bal_after,
                       sender_balance_ratio, is_high_value):
     """
-    Build the WoE input dataframe for the scorecard model.
-    Uses only the 4 features selected by IV analysis.
+    Apply WoE transformation manually using saved bin boundaries.
+    Replicates sc.woebin_ply() without requiring scorecardpy at runtime.
     """
-    raw = pd.DataFrame([{
-        'amount':                amount,
-        'sender_balance_after':  sender_bal_after,
-        'sender_balance_ratio':  sender_balance_ratio,
-        'is_high_value':         is_high_value,
-    }])
+    def get_woe(value, bin_df):
+        """Look up the WoE value for a given raw input using bin boundaries."""
+        for _, row in bin_df.iterrows():
+            bin_range = str(row['bin'])
+            # Handle missing bin
+            if bin_range == 'missing':
+                continue
+            # Parse bin boundaries from scorecardpy format e.g. [-inf, 500.0)
+            bin_range = bin_range.replace('[-inf', '(-inf')
+            try:
+                lower = float(bin_range.split(',')[0].strip('([)]-inf ').replace('-inf', '-999999999'))
+                upper = float(bin_range.split(',')[1].strip('([)] inf').replace('inf', '999999999'))
+                low_inc  = '[' in bin_range.split(',')[0]
+                high_inc = ']' in bin_range.split(',')[1]
 
-    # Apply WoE transformation using saved bins
-    woe_transformed = sc.woebin_ply(raw, woe_bins)
-    return woe_transformed
+                if low_inc:
+                    lower_check = value >= lower
+                else:
+                    lower_check = value > lower
+
+                if high_inc:
+                    upper_check = value <= upper
+                else:
+                    upper_check = value < upper
+
+                if lower_check and upper_check:
+                    return float(row['woe'])
+            except Exception:
+                continue
+        # Return 0 if no bin matched
+        return 0.0
+
+    result = {}
+    feature_map = {
+        'amount':               amount,
+        'sender_balance_after': sender_bal_after,
+        'sender_balance_ratio': sender_balance_ratio,
+        'is_high_value':        is_high_value,
+    }
+
+    for feature, value in feature_map.items():
+        if feature in woe_bins:
+            woe_val = get_woe(value, woe_bins[feature])
+            result[f'{feature}_woe'] = woe_val
+
+    return pd.DataFrame([result])
 
 
 # ─────────────────────────────────────────────────────────────
