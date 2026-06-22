@@ -127,10 +127,15 @@ st.markdown(f"""
         height: 100%;
     }}
 
-    /* Input labels */
-    .stNumberInput label, .stSlider label, .stSelectbox label {{
-        font-weight: 600;
-        color: {SAF_DARK_TEXT};
+  /* Input labels — force white text so they show on dark background */
+    .stNumberInput label, .stSlider label, .stSelectbox label,
+    .stNumberInput p, .stSlider p, .stSelectbox p,
+    label[data-testid="stWidgetLabel"],
+    label[data-testid="stWidgetLabel"] p {{
+        font-weight: 600 !important;
+        color: #FFFFFF !important;
+        font-size: 14px !important;
+        opacity: 1 !important;
     }}
 
     /* Primary button */
