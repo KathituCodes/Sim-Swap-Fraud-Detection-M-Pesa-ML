@@ -287,10 +287,11 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         return 0.0
 
     result = {}
+   # Feature map must match exact column order the WoE model was trained on
     feature_map = {
+        'sender_balance_ratio': sender_balance_ratio,
         'amount':               amount,
         'sender_balance_after': sender_bal_after,
-        'sender_balance_ratio': sender_balance_ratio,
         'is_high_value':        is_high_value,
     }
     for feature, value in feature_map.items():
