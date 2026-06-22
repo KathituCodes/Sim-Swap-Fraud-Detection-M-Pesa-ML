@@ -298,7 +298,16 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         if feature in woe_bins:
             result[f'{feature}_woe'] = get_woe(value, woe_bins[feature])
 
-    return pd.DataFrame([result])
+    # Force exact column order to match what the WoE model was trained on
+    expected_columns = [
+        'sender_balance_ratio_woe',
+        'amount_woe',
+        'sender_balance_after_woe',
+        'is_high_value_woe'
+    ]
+    df = pd.DataFrame([result])
+    df = df[expected_columns]
+    return df
 
 
 # ─────────────────────────────────────────────────────────────
