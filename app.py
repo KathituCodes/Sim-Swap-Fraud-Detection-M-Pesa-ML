@@ -745,11 +745,12 @@ elif page == "📋 Scorecard Audit":
     with col_woe_result:
         st.markdown(f'<div class="section-header">🎯 Scorecard Result</div>', unsafe_allow_html=True)
 
-        if woe_btn:
+       if woe_btn:
             woe_is_high  = 1 if woe_amount > 3800 else 0
             woe_ratio    = woe_s_after / (woe_s_before + 1)
 
-           woe_input    = prepare_woe_input(woe_amount, woe_s_after, woe_ratio, woe_is_high)
+            woe_input = prepare_woe_input(woe_amount, woe_s_after, woe_ratio, woe_is_high)
+
             if 'is_balance_wipeout' in woe_input.columns:
                 woe_input = woe_input.drop(columns=['is_balance_wipeout'])
 
@@ -758,11 +759,10 @@ elif page == "📋 Scorecard Audit":
             st.write("Values:", woe_input.values)
             st.write("Model expects:", woe_model.feature_names_in_.tolist())
 
-            # Predict
             woe_prob     = woe_model.predict_proba(woe_input)[0][1]
             woe_pred     = woe_model.predict(woe_input)[0]
             woe_pct      = round(woe_prob * 100, 1)
-
+           
             if woe_pred == 1:
                 st.markdown(f"""
                 <div class="fraud-alert">
