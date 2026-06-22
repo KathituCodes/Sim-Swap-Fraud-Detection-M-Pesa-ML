@@ -10,15 +10,6 @@ import matplotlib.patches as mpatches
 M-Pesa SIM Swap Fraud Detection Dashboard
 =============================================================
 Design  : Inspired by the My Safaricom App visual identity
-
-# Brand Colors:
-#  Safaricom Green : #30B54A
-#  Safaricom Dark  : #006633
-#  Safaricom Red   : #E2001A
-#  White           : #FFFFFF
-#  Light Grey      : #F5F5F5
-#  Dark Text       : #1A1A1A
-=============================================================
 """
 
 # ─────────────────────────────────────────────────────────────
