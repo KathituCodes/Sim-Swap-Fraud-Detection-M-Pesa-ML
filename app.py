@@ -12,7 +12,7 @@ Author : Urbanus Kathitu (Kat.Codes)
 GitHub : github.com/KathituCodes/SIM-Swap-Fraud-Detection-M-Pesa-ML
 """
 
-# PAGE CONFIG
+# PAGE CONFIG — must be the very first Streamlit call
 st.set_page_config(
     page_title="M-Pesa Fraud Detector",
     page_icon="🔐",
@@ -134,6 +134,77 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
+# ─────────────────────────────────────────────────────────────
+# SESSION STATE — persists values across Streamlit reruns
+# This is required for the Quick Test buttons to work correctly.
+# When a button is clicked, we write the test values into
+# session state. The input widgets then read from session state
+# as their default values on the next rerun.
+# ─────────────────────────────────────────────────────────────
+def init_state():
+    if 'amount'   not in st.session_state:
+        st.session_state.amount          = 500.0
+        st.session_state.sender_before   = 5000.0
+        st.session_state.sender_after    = 4500.0
+        st.session_state.receiver_before = 1000.0
+        st.session_state.receiver_after  = 1500.0
+        st.session_state.hour            = 14
+        st.session_state.txn_type        = "peer"
+        st.session_state.device          = "smartphone"
+        st.session_state.region          = "Nairobi"
+        st.session_state.day             = "Tue"
+        # Scorecard inputs
+        st.session_state.woe_amount      = 500.0
+        st.session_state.woe_s_before    = 5000.0
+        st.session_state.woe_s_after     = 4500.0
+
+init_state()
+
+def load_fraud():
+    """Load a clear SIM swap fraud example into session state.
+    Fraud pattern: nearly entire balance drained in one transaction.
+    Sender starts with KES 5,000, sends KES 4,900, leaves only KES 50.
+    sender_balance_ratio = 50/5001 = 0.01 (near zero = account drained)
+    is_balance_wipeout = 1 (balance below KES 100)
+    is_high_value = 1 (amount 4900 > 3800 threshold)
+    """
+    st.session_state.amount          = 4900.0
+    st.session_state.sender_before   = 5000.0
+    st.session_state.sender_after    = 50.0
+    st.session_state.receiver_before = 1000.0
+    st.session_state.receiver_after  = 5900.0
+    st.session_state.hour            = 2
+    st.session_state.txn_type        = "peer"
+    st.session_state.device          = "smartphone"
+    st.session_state.region          = "Nairobi"
+    st.session_state.day             = "Tue"
+    st.session_state.woe_amount      = 4900.0
+    st.session_state.woe_s_before    = 5000.0
+    st.session_state.woe_s_after     = 50.0
+
+def load_legit():
+    """Load a clear legitimate transaction example into session state.
+    Legitimate pattern: small routine payment, most of balance remains.
+    Sender starts with KES 25,000, sends KES 300, leaves KES 24,700.
+    sender_balance_ratio = 24700/25001 = 0.988 (near 1 = almost nothing spent)
+    is_balance_wipeout = 0
+    is_high_value = 0
+    """
+    st.session_state.amount          = 300.0
+    st.session_state.sender_before   = 25000.0
+    st.session_state.sender_after    = 24700.0
+    st.session_state.receiver_before = 3000.0
+    st.session_state.receiver_after  = 3300.0
+    st.session_state.hour            = 14
+    st.session_state.txn_type        = "paybill"
+    st.session_state.device          = "smartphone"
+    st.session_state.region          = "Nairobi"
+    st.session_state.day             = "Wed"
+    st.session_state.woe_amount      = 300.0
+    st.session_state.woe_s_before    = 25000.0
+    st.session_state.woe_s_after     = 24700.0
+
+
 # LOAD MODELS
 @st.cache_resource
 def load_models():
@@ -148,21 +219,16 @@ xgb_model, scaler, woe_model, woe_bins = load_models()
 
 
 # FEATURE ENGINEERING
-# Must exactly replicate notebook Cell 52 transformations and Cell 54 column order
 def engineer_features(amount, sender_bal_before, sender_bal_after,
                       receiver_bal_before, receiver_bal_after,
                       hour, transaction_type, device_type,
                       region, day_of_week):
 
-    # Four SIM swap behavioral proxy features
     balance_depletion_rate = amount / (sender_bal_before + 1)
-    # 90th percentile of amount in training data is approximately 3800
     is_high_value          = 1 if amount > 3800 else 0
     is_balance_wipeout     = 1 if sender_bal_after < 100 else 0
     sender_balance_ratio   = sender_bal_after / (sender_bal_before + 1)
 
-    # One-hot encoding matching get_dummies(drop_first=True) from notebook
-    # drop_first removes: paybill, feature, Eldoret, Fri
     txn_peer       = 1 if transaction_type == "peer"       else 0
     txn_till       = 1 if transaction_type == "till"       else 0
     dev_smartphone = 1 if device_type      == "smartphone" else 0
@@ -177,7 +243,6 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
     day_tue        = 1 if day_of_week      == "Tue"        else 0
     day_wed        = 1 if day_of_week      == "Wed"        else 0
 
-    # Exact column order from Cell 54 notebook output
     features = {
         'amount':                    amount,
         'sender_balance_before':     sender_bal_before,
@@ -215,8 +280,9 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
 def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_value):
     """
     Manually applies WoE bin transformation without scorecardpy.
-    scorecardpy uses pkg_resources which is unavailable on Python 3.11+.
-    This replicates sc.woebin_ply() using saved bin boundaries from woe_bins.pkl.
+    Replicates sc.woebin_ply() using saved bin boundaries from woe_bins.pkl.
+    scorecardpy is not used at runtime because it requires pkg_resources
+    which is unavailable on Python 3.11+ (Streamlit Cloud environment).
     """
     def get_woe(value, bin_df):
         for _, row in bin_df.iterrows():
@@ -248,7 +314,6 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         if feature in woe_bins:
             result[f'{feature}_woe'] = get_woe(value, woe_bins[feature])
 
-    # Force exact column order matching woe_model.feature_names_in_
     expected_columns = [
         'sender_balance_ratio_woe',
         'amount_woe',
@@ -256,7 +321,6 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         'is_high_value_woe'
     ]
     df = pd.DataFrame([result])
-    # Add any missing columns as 0
     for col in expected_columns:
         if col not in df.columns:
             df[col] = 0.0
@@ -294,8 +358,10 @@ with st.sidebar:
     st.markdown("<p style='color:#A8D5B5; font-size:12px; font-weight:600; margin-bottom:8px;'>QUICK TEST</p>",
                 unsafe_allow_html=True)
 
-    fraud_test = st.button("⚠️ Load Fraud Example",  use_container_width=True)
-    legit_test = st.button("✅ Load Safe Example",    use_container_width=True)
+    # on_click loads the values into session state BEFORE the page reruns
+    # This ensures the input widgets always read the correct values
+    st.button("⚠️ Load Fraud Example",  use_container_width=True, on_click=load_fraud)
+    st.button("✅ Load Safe Example",    use_container_width=True, on_click=load_legit)
 
     st.markdown("<hr style='border-color:#004d26; margin:16px 0;'>", unsafe_allow_html=True)
 
@@ -314,27 +380,6 @@ with st.sidebar:
         📊 344% increase YoY (CBK)
     </div>
     """, unsafe_allow_html=True)
-
-
-# DEFAULT INPUT VALUES
-# Fraud: large amount draining a small balance to near zero
-# Sender starts with 5000, sends 4900, leaves only 50 — classic account wipeout
-if fraud_test:
-    d_amount   = 4900.0;  d_s_before = 5000.0;  d_s_after = 50.0
-    d_r_before = 1000.0;  d_r_after  = 5900.0;  d_hour    = 2
-    d_txn      = "peer";  d_device   = "smartphone"
-    d_region   = "Nairobi"; d_day    = "Tue"
-# Legitimate: small routine payment, most of balance remains
-elif legit_test:
-    d_amount   = 300.0;   d_s_before = 25000.0; d_s_after = 24700.0
-    d_r_before = 3000.0;  d_r_after  = 3300.0;  d_hour    = 14
-    d_txn      = "paybill"; d_device = "smartphone"
-    d_region   = "Nairobi"; d_day    = "Wed"
-else:
-    d_amount   = 500.0;   d_s_before = 5000.0;  d_s_after = 4500.0
-    d_r_before = 1000.0;  d_r_after  = 1500.0;  d_hour    = 14
-    d_txn      = "peer";  d_device   = "smartphone"
-    d_region   = "Nairobi"; d_day    = "Tue"
 
 
 # PAGE: HOME
@@ -367,7 +412,6 @@ if page == "🏠 Home":
     c5.metric("All Models AUC",        "~0.83",  delta="Strong separation")
 
     st.markdown("<br>", unsafe_allow_html=True)
-
     st.markdown(f'<div class="section-header">What does this tool do?</div>', unsafe_allow_html=True)
 
     col_a, col_b, col_c = st.columns(3)
@@ -481,42 +525,87 @@ elif page == "🔍 Check a Transaction":
     col_form, col_result = st.columns([1, 1], gap="large")
 
     with col_form:
-        st.markdown(f'<div class="section-header">💳 Transaction Details</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">💳 Transaction Details</div>',
+                    unsafe_allow_html=True)
 
-        amount          = st.number_input("Transaction Amount (KES)",
-                            min_value=1.0, max_value=500000.0, value=d_amount, step=100.0)
-        sender_before   = st.number_input("Sender Balance Before (KES)",
-                            min_value=0.0, max_value=1000000.0, value=d_s_before, step=500.0)
-        sender_after    = st.number_input("Sender Balance After (KES)",
-                            min_value=0.0, max_value=1000000.0, value=d_s_after, step=500.0)
-        receiver_before = st.number_input("Receiver Balance Before (KES)",
-                            min_value=0.0, max_value=1000000.0, value=d_r_before, step=500.0)
-        receiver_after  = st.number_input("Receiver Balance After (KES)",
-                            min_value=0.0, max_value=1000000.0, value=d_r_after, step=500.0)
-        hour            = st.slider("Hour of Transaction (0 = Midnight, 23 = 11pm)",
-                            0, 23, value=d_hour)
+        amount = st.number_input(
+            "Transaction Amount (KES)",
+            min_value=1.0, max_value=500000.0,
+            value=st.session_state.amount, step=100.0,
+            key="input_amount"
+        )
+        sender_before = st.number_input(
+            "Sender Balance Before (KES)",
+            min_value=0.0, max_value=1000000.0,
+            value=st.session_state.sender_before, step=500.0,
+            key="input_sb"
+        )
+        sender_after = st.number_input(
+            "Sender Balance After (KES)",
+            min_value=0.0, max_value=1000000.0,
+            value=st.session_state.sender_after, step=500.0,
+            key="input_sa"
+        )
+        receiver_before = st.number_input(
+            "Receiver Balance Before (KES)",
+            min_value=0.0, max_value=1000000.0,
+            value=st.session_state.receiver_before, step=500.0,
+            key="input_rb"
+        )
+        receiver_after = st.number_input(
+            "Receiver Balance After (KES)",
+            min_value=0.0, max_value=1000000.0,
+            value=st.session_state.receiver_after, step=500.0,
+            key="input_ra"
+        )
+        hour = st.slider(
+            "Hour of Transaction (0 = Midnight, 23 = 11pm)",
+            0, 23,
+            value=st.session_state.hour,
+            key="input_hour"
+        )
 
-        st.markdown(f'<div class="section-header">📱 Transaction Context</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">📱 Transaction Context</div>',
+                    unsafe_allow_html=True)
 
-        txn_type = st.selectbox("Transaction Type",
-                     ["peer", "till", "paybill"],
-                     index=["peer","till","paybill"].index(d_txn),
-                     help="peer = person to person | till = business till | paybill = bill payment")
-        device   = st.selectbox("Device Type",
-                     ["smartphone", "feature"],
-                     index=["smartphone","feature"].index(d_device),
-                     help="smartphone = Android or iOS | feature = basic USSD phone")
-        region   = st.selectbox("Region",
-                     ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"],
-                     index=["Nairobi","Mombasa","Kisumu","Nakuru","Eldoret"].index(d_region))
-        day      = st.selectbox("Day of Week",
-                     ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
-                     index=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].index(d_day))
+        txn_list   = ["peer", "till", "paybill"]
+        dev_list   = ["smartphone", "feature"]
+        reg_list   = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"]
+        day_list   = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-        check_btn = st.button("🔍 Check Transaction", type="primary", use_container_width=True)
+        txn_type = st.selectbox(
+            "Transaction Type",
+            txn_list,
+            index=txn_list.index(st.session_state.txn_type),
+            key="input_txn",
+            help="peer = person to person | till = business till | paybill = bill payment"
+        )
+        device = st.selectbox(
+            "Device Type",
+            dev_list,
+            index=dev_list.index(st.session_state.device),
+            key="input_device",
+            help="smartphone = Android or iOS | feature = basic USSD phone"
+        )
+        region = st.selectbox(
+            "Region",
+            reg_list,
+            index=reg_list.index(st.session_state.region),
+            key="input_region"
+        )
+        day = st.selectbox(
+            "Day of Week",
+            day_list,
+            index=day_list.index(st.session_state.day),
+            key="input_day"
+        )
+
+        check_btn = st.button("🔍 Check Transaction", type="primary",
+                              use_container_width=True)
 
     with col_result:
-        st.markdown(f'<div class="section-header">🎯 Detection Result</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">🎯 Detection Result</div>',
+                    unsafe_allow_html=True)
 
         if check_btn:
             X_input, eng = engineer_features(
@@ -566,17 +655,18 @@ elif page == "🔍 Check a Transaction":
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Probability gauge
             fig, ax = plt.subplots(figsize=(7, 1.5))
             bar_color = SAF_RED if prediction == 1 else SAF_GREEN
             ax.barh(['Risk Level'], [pct],       color=bar_color, alpha=0.85, height=0.5)
-            ax.barh(['Risk Level'], [100 - pct], left=[pct], color='#E0E0E0', alpha=0.5, height=0.5)
+            ax.barh(['Risk Level'], [100 - pct], left=[pct], color='#E0E0E0',
+                    alpha=0.5, height=0.5)
             ax.axvline(x=50, color='orange', linestyle='--', linewidth=1.5)
             ax.set_xlim(0, 100)
             ax.set_xlabel('Fraud Probability (%)')
-            label_x = max(pct / 2, 5)
-            ax.text(min(label_x, 45), 0, f'{pct}%',
-                    ha='center', va='center', color='white', fontweight='bold', fontsize=13)
+            label_x = min(pct / 2, 45) if pct > 5 else 5
+            ax.text(label_x, 0, f'{pct}%',
+                    ha='center', va='center', color='white',
+                    fontweight='bold', fontsize=12)
             ax.set_title('Fraud Probability Score', fontsize=11,
                          color=SAF_DARK_GREEN, fontweight='bold')
             fig.patch.set_facecolor('white')
@@ -584,15 +674,13 @@ elif page == "🔍 Check a Transaction":
             st.pyplot(fig)
             plt.close()
 
-            # Behavioral signals
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f'<div class="section-header">🧬 SIM Swap Behavioral Signals</div>',
                         unsafe_allow_html=True)
             st.markdown("""
             <p style='color:#555; font-size:13px; margin-bottom:12px;'>
                 These four engineered features capture the account drainage
-                pattern of a SIM swap attack. The model uses these to make
-                its decision.
+                pattern of a SIM swap attack.
             </p>
             """, unsafe_allow_html=True)
 
@@ -652,19 +740,30 @@ elif page == "📋 Scorecard Audit":
     col_woe_form, col_woe_result = st.columns([1, 1], gap="large")
 
     with col_woe_form:
-        st.markdown(f'<div class="section-header">💳 Transaction Inputs</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">💳 Transaction Inputs</div>',
+                    unsafe_allow_html=True)
 
-        woe_amount   = st.number_input("Amount (KES)",
-                           min_value=1.0, max_value=500000.0,
-                           value=d_amount, step=100.0, key="woe_amount")
-        woe_s_before = st.number_input("Sender Balance Before (KES)",
-                           min_value=0.0, max_value=1000000.0,
-                           value=d_s_before, step=500.0, key="woe_sb")
-        woe_s_after  = st.number_input("Sender Balance After (KES)",
-                           min_value=0.0, max_value=1000000.0,
-                           value=d_s_after, step=500.0, key="woe_sa")
+        woe_amount = st.number_input(
+            "Amount (KES)",
+            min_value=1.0, max_value=500000.0,
+            value=st.session_state.woe_amount, step=100.0,
+            key="woe_input_amount"
+        )
+        woe_s_before = st.number_input(
+            "Sender Balance Before (KES)",
+            min_value=0.0, max_value=1000000.0,
+            value=st.session_state.woe_s_before, step=500.0,
+            key="woe_input_sb"
+        )
+        woe_s_after = st.number_input(
+            "Sender Balance After (KES)",
+            min_value=0.0, max_value=1000000.0,
+            value=st.session_state.woe_s_after, step=500.0,
+            key="woe_input_sa"
+        )
 
-        woe_btn = st.button("📋 Run Scorecard Audit", type="primary", use_container_width=True)
+        woe_btn = st.button("📋 Run Scorecard Audit", type="primary",
+                            use_container_width=True)
 
         st.markdown(f"""
         <div class="warning-box" style='margin-top:16px;'>
@@ -677,13 +776,16 @@ elif page == "📋 Scorecard Audit":
         """, unsafe_allow_html=True)
 
     with col_woe_result:
-        st.markdown(f'<div class="section-header">🎯 Scorecard Result</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">🎯 Scorecard Result</div>',
+                    unsafe_allow_html=True)
 
         if woe_btn:
             woe_is_high = 1 if woe_amount > 3800 else 0
             woe_ratio   = woe_s_after / (woe_s_before + 1)
 
-            woe_input = prepare_woe_input(woe_amount, woe_s_after, woe_ratio, woe_is_high)
+            woe_input = prepare_woe_input(
+                woe_amount, woe_s_after, woe_ratio, woe_is_high
+            )
 
             woe_prob = woe_model.predict_proba(woe_input)[0][1]
             woe_pred = woe_model.predict(woe_input)[0]
@@ -734,10 +836,12 @@ elif page == "📋 Scorecard Audit":
             woe_display['Signal'] = woe_display['WoE Score'].apply(
                 lambda x: '🔴 Fraud signal' if x > 0 else '🟢 Legitimate signal'
             )
-            woe_display['Feature'] = (woe_display['Feature']
-                                      .str.replace('_woe', '', regex=False)
-                                      .str.replace('_', ' ', regex=False)
-                                      .str.title())
+            woe_display['Feature'] = (
+                woe_display['Feature']
+                .str.replace('_woe', '', regex=False)
+                .str.replace('_', ' ', regex=False)
+                .str.title()
+            )
             st.dataframe(woe_display, use_container_width=True, hide_index=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -828,8 +932,8 @@ elif page == "📊 Model Results":
 
     st.dataframe(
         comp_df.style.apply(highlight_best,
-                            subset=['Precision','Recall','F1-Score','AUC-ROC',
-                                    'False Positives','Fraud Caught']),
+                            subset=['Precision', 'Recall', 'F1-Score', 'AUC-ROC',
+                                    'False Positives', 'Fraud Caught']),
         use_container_width=True, hide_index=True
     )
     st.markdown("<p style='color:#888; font-size:12px;'>Green = best value in that column</p>",
@@ -844,7 +948,8 @@ elif page == "📊 Model Results":
     clrs     = ['#888888', SAF_DARK_GREEN, '#FFA000', SAF_RED]
 
     with col_ch1:
-        st.markdown(f'<div class="section-header">Precision vs Recall</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">Precision vs Recall</div>',
+                    unsafe_allow_html=True)
         fig3, ax3 = plt.subplots(figsize=(7, 4))
         ax3.bar(x - w/2, comp_df['Precision'], w, color=clrs, alpha=0.9,  edgecolor='white')
         ax3.bar(x + w/2, comp_df['Recall'],    w, color=clrs, alpha=0.45, edgecolor='white')
