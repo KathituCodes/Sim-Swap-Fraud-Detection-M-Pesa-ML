@@ -303,28 +303,20 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
                 continue
         return 0.0
 
-    result = {}
-    feature_map = {
-        'sender_balance_ratio': sender_balance_ratio,
-        'amount':               amount,
-        'sender_balance_after': sender_bal_after,
-        'is_high_value':        is_high_value,
-    }
-    for feature, value in feature_map.items():
-        if feature in woe_bins:
-            result[f'{feature}_woe'] = get_woe(value, woe_bins[feature])
+    # Build WoE scores for each feature using saved bin boundaries
+    amount_woe               = get_woe(amount,               woe_bins['amount'])
+    is_high_value_woe        = get_woe(is_high_value,        woe_bins['is_high_value'])
+    sender_balance_ratio_woe = get_woe(sender_balance_ratio, woe_bins['sender_balance_ratio'])
+    sender_balance_after_woe = get_woe(sender_bal_after,     woe_bins['sender_balance_after'])
 
-    expected_columns = [
-        'sender_balance_ratio_woe',
-        'amount_woe',
-        'sender_balance_after_woe',
-        'is_high_value_woe'
-    ]
-    df = pd.DataFrame([result])
-    for col in expected_columns:
-        if col not in df.columns:
-            df[col] = 0.0
-    df = df[expected_columns]
+    # Column order must exactly match woe_model.feature_names_in_
+    # ['amount_woe', 'is_high_value_woe', 'sender_balance_ratio_woe', 'sender_balance_after_woe']
+    df = pd.DataFrame([{
+        'amount_woe':               amount_woe,
+        'is_high_value_woe':        is_high_value_woe,
+        'sender_balance_ratio_woe': sender_balance_ratio_woe,
+        'sender_balance_after_woe': sender_balance_after_woe,
+    }])
     return df
 
 
