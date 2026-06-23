@@ -4,17 +4,15 @@ import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 """
 M-Pesa SIM Swap Fraud Detection Dashboard
-=============================================================
 Design : Inspired by the My Safaricom App visual identity
+Author : Urbanus Kathitu (Kat.Codes)
+GitHub : github.com/KathituCodes/SIM-Swap-Fraud-Detection-M-Pesa-ML
 """
 
-# ─────────────────────────────────────────────────────────────
-# PAGE CONFIG — must be first Streamlit call
-# ─────────────────────────────────────────────────────────────
+# PAGE CONFIG
 st.set_page_config(
     page_title="M-Pesa Fraud Detector",
     page_icon="🔐",
@@ -22,34 +20,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ─────────────────────────────────────────────────────────────
 # SAFARICOM BRAND COLORS
-# ─────────────────────────────────────────────────────────────
-SAF_GREEN      = "#30B54A"   # Primary Safaricom green
-SAF_DARK_GREEN = "#006633"   # Deep green for headers
-SAF_RED        = "#E2001A"   # Safaricom red for fraud alerts
-SAF_LIGHT      = "#F0FAF2"   # Very light green tint for backgrounds
-SAF_GREY       = "#F5F5F5"   # Light grey for card backgrounds
-SAF_DARK_TEXT  = "#1A1A1A"   # Primary text
-SAF_MID_TEXT   = "#555555"   # Secondary text
+SAF_GREEN      = "#30B54A"
+SAF_DARK_GREEN = "#006633"
+SAF_RED        = "#E2001A"
+SAF_LIGHT      = "#F0FAF2"
+SAF_GREY       = "#F5F5F5"
+SAF_DARK_TEXT  = "#1A1A1A"
+SAF_MID_TEXT   = "#555555"
 WHITE          = "#FFFFFF"
 
-# ─────────────────────────────────────────────────────────────
-# CUSTOM CSS — My Safaricom App look and feel
-# ─────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
-    /* Page background */
-    .main {{
-        background-color: #F8FAF8;
-    }}
-
-    /* Sidebar */
+    .main {{ background-color: #F8FAF8; }}
     [data-testid="stSidebar"] {{
         background: linear-gradient(180deg, {SAF_DARK_GREEN} 0%, #004d26 100%);
     }}
-
-    /* Metric cards — green left border */
     [data-testid="metric-container"] {{
         background-color: {WHITE};
         border: 1px solid #E0E0E0;
@@ -58,8 +44,6 @@ st.markdown(f"""
         padding: 14px 18px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.06);
     }}
-
-    /* Fraud alert box */
     .fraud-alert {{
         background: linear-gradient(135deg, #FFF0F0, #FFE5E5);
         border: 2px solid {SAF_RED};
@@ -69,8 +53,6 @@ st.markdown(f"""
         margin: 12px 0;
         box-shadow: 0 4px 12px rgba(226,0,26,0.15);
     }}
-
-    /* Legitimate alert box */
     .legit-alert {{
         background: linear-gradient(135deg, #F0FAF2, #E8F5E9);
         border: 2px solid {SAF_GREEN};
@@ -80,8 +62,6 @@ st.markdown(f"""
         margin: 12px 0;
         box-shadow: 0 4px 12px rgba(48,181,74,0.15);
     }}
-
-    /* Info boxes */
     .info-box {{
         background-color: {SAF_LIGHT};
         border-left: 5px solid {SAF_GREEN};
@@ -92,7 +72,6 @@ st.markdown(f"""
         color: {SAF_DARK_GREEN};
         line-height: 1.6;
     }}
-
     .warning-box {{
         background-color: #FFF8E1;
         border-left: 5px solid #FFA000;
@@ -103,8 +82,6 @@ st.markdown(f"""
         color: #5D4037;
         line-height: 1.6;
     }}
-
-    /* Section headers — Safaricom green gradient */
     .section-header {{
         background: linear-gradient(90deg, {SAF_DARK_GREEN}, {SAF_GREEN});
         color: white;
@@ -115,8 +92,6 @@ st.markdown(f"""
         margin-bottom: 16px;
         letter-spacing: 0.3px;
     }}
-
-    /* Stat cards */
     .stat-card {{
         background: white;
         border-radius: 12px;
@@ -126,8 +101,6 @@ st.markdown(f"""
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         height: 100%;
     }}
-
-  /* Input labels — force white text so they show on dark background */
     .stNumberInput label, .stSlider label, .stSelectbox label,
     .stNumberInput p, .stSlider p, .stSelectbox p,
     label[data-testid="stWidgetLabel"],
@@ -137,8 +110,12 @@ st.markdown(f"""
         font-size: 14px !important;
         opacity: 1 !important;
     }}
-
-    /* Primary button */
+    .stSlider [data-testid="stWidgetLabel"],
+    .stNumberInput [data-testid="stWidgetLabel"],
+    .stSelectbox [data-testid="stWidgetLabel"] {{
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }}
     .stButton > button[kind="primary"] {{
         background: linear-gradient(90deg, {SAF_DARK_GREEN}, {SAF_GREEN});
         color: white;
@@ -149,29 +126,7 @@ st.markdown(f"""
         font-weight: 700;
         letter-spacing: 0.5px;
         box-shadow: 0 4px 12px rgba(48,181,74,0.3);
-        transition: all 0.3s ease;
     }}
-
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 8px;
-        background-color: {SAF_GREY};
-        border-radius: 10px;
-        padding: 4px;
-    }}
-
-    .stTabs [data-baseweb="tab"] {{
-        border-radius: 8px;
-        font-weight: 600;
-        color: {SAF_MID_TEXT};
-    }}
-
-    .stTabs [aria-selected="true"] {{
-        background-color: {SAF_GREEN};
-        color: white;
-    }}
-
-    /* Hide Streamlit branding */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     header {{visibility: hidden;}}
@@ -179,11 +134,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────
 # LOAD MODELS
-# @st.cache_resource loads models once and reuses them
-# across all sessions — avoids reloading on every interaction
-# ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_models():
     xgb_model = joblib.load("xgboost_fraud_model.pkl")
@@ -196,23 +147,22 @@ def load_models():
 xgb_model, scaler, woe_model, woe_bins = load_models()
 
 
-# ─────────────────────────────────────────────────────────────
 # FEATURE ENGINEERING
-# Replicates the exact same transformations done in the notebook.
-# Column order must match the training data exactly.
-# ─────────────────────────────────────────────────────────────
+# Must exactly replicate notebook Cell 52 transformations and Cell 54 column order
 def engineer_features(amount, sender_bal_before, sender_bal_after,
                       receiver_bal_before, receiver_bal_after,
                       hour, transaction_type, device_type,
                       region, day_of_week):
 
-    # The four SIM swap behavioral proxy features
+    # Four SIM swap behavioral proxy features
     balance_depletion_rate = amount / (sender_bal_before + 1)
+    # 90th percentile of amount in training data is approximately 3800
     is_high_value          = 1 if amount > 3800 else 0
     is_balance_wipeout     = 1 if sender_bal_after < 100 else 0
     sender_balance_ratio   = sender_bal_after / (sender_bal_before + 1)
 
-    # One-hot encoding — must match get_dummies(drop_first=True) from notebook
+    # One-hot encoding matching get_dummies(drop_first=True) from notebook
+    # drop_first removes: paybill, feature, Eldoret, Fri
     txn_peer       = 1 if transaction_type == "peer"       else 0
     txn_till       = 1 if transaction_type == "till"       else 0
     dev_smartphone = 1 if device_type      == "smartphone" else 0
@@ -227,7 +177,7 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
     day_tue        = 1 if day_of_week      == "Tue"        else 0
     day_wed        = 1 if day_of_week      == "Wed"        else 0
 
-    # Exact column order from df_clean after encoding (Cell 54 in notebook)
+    # Exact column order from Cell 54 notebook output
     features = {
         'amount':                    amount,
         'sender_balance_before':     sender_bal_before,
@@ -265,7 +215,8 @@ def engineer_features(amount, sender_bal_before, sender_bal_after,
 def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_value):
     """
     Manually applies WoE bin transformation without scorecardpy.
-    Looks up the WoE score for each feature value using the saved bin boundaries.
+    scorecardpy uses pkg_resources which is unavailable on Python 3.11+.
+    This replicates sc.woebin_ply() using saved bin boundaries from woe_bins.pkl.
     """
     def get_woe(value, bin_df):
         for _, row in bin_df.iterrows():
@@ -287,7 +238,6 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         return 0.0
 
     result = {}
-   # Feature map must match exact column order the WoE model was trained on
     feature_map = {
         'sender_balance_ratio': sender_balance_ratio,
         'amount':               amount,
@@ -298,7 +248,7 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         if feature in woe_bins:
             result[f'{feature}_woe'] = get_woe(value, woe_bins[feature])
 
-    # Force exact column order to match what the WoE model was trained on
+    # Force exact column order matching woe_model.feature_names_in_
     expected_columns = [
         'sender_balance_ratio_woe',
         'amount_woe',
@@ -306,15 +256,16 @@ def prepare_woe_input(amount, sender_bal_after, sender_balance_ratio, is_high_va
         'is_high_value_woe'
     ]
     df = pd.DataFrame([result])
+    # Add any missing columns as 0
+    for col in expected_columns:
+        if col not in df.columns:
+            df[col] = 0.0
     df = df[expected_columns]
     return df
 
 
-# ─────────────────────────────────────────────────────────────
 # SIDEBAR
-# ─────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Logo area
     st.markdown(f"""
     <div style='text-align:center; padding:20px 0 10px 0;'>
         <div style='font-size:40px;'>🔐</div>
@@ -329,7 +280,6 @@ with st.sidebar:
     <hr style='border-color:#004d26; margin:12px 0;'>
     """, unsafe_allow_html=True)
 
-    # Navigation
     st.markdown("<p style='color:#A8D5B5; font-size:12px; font-weight:600; margin-bottom:8px;'>NAVIGATE</p>",
                 unsafe_allow_html=True)
 
@@ -341,7 +291,6 @@ with st.sidebar:
 
     st.markdown("<hr style='border-color:#004d26; margin:16px 0;'>", unsafe_allow_html=True)
 
-    # Quick test buttons
     st.markdown("<p style='color:#A8D5B5; font-size:12px; font-weight:600; margin-bottom:8px;'>QUICK TEST</p>",
                 unsafe_allow_html=True)
 
@@ -350,7 +299,6 @@ with st.sidebar:
 
     st.markdown("<hr style='border-color:#004d26; margin:16px 0;'>", unsafe_allow_html=True)
 
-    # Stats
     st.markdown(f"""
     <div style='color:#A8D5B5; font-size:11px; line-height:1.9;'>
         <p style='color:white; font-size:12px; font-weight:600; margin-bottom:6px;'>DATASET</p>
@@ -368,17 +316,18 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────
-# DEFAULT VALUES FOR INPUTS
-# ─────────────────────────────────────────────────────────────
+# DEFAULT INPUT VALUES
+# Fraud: large amount draining a small balance to near zero
+# Sender starts with 5000, sends 4900, leaves only 50 — classic account wipeout
 if fraud_test:
     d_amount   = 4900.0;  d_s_before = 5000.0;  d_s_after = 50.0
     d_r_before = 1000.0;  d_r_after  = 5900.0;  d_hour    = 2
     d_txn      = "peer";  d_device   = "smartphone"
     d_region   = "Nairobi"; d_day    = "Tue"
+# Legitimate: small routine payment, most of balance remains
 elif legit_test:
-    d_amount   = 500.0;   d_s_before = 25000.0; d_s_after = 24500.0
-    d_r_before = 3000.0;  d_r_after  = 3500.0;  d_hour    = 14
+    d_amount   = 300.0;   d_s_before = 25000.0; d_s_after = 24700.0
+    d_r_before = 3000.0;  d_r_after  = 3300.0;  d_hour    = 14
     d_txn      = "paybill"; d_device = "smartphone"
     d_region   = "Nairobi"; d_day    = "Wed"
 else:
@@ -388,12 +337,9 @@ else:
     d_region   = "Nairobi"; d_day    = "Tue"
 
 
-# ═══════════════════════════════════════════════════════════
 # PAGE: HOME
-# ═══════════════════════════════════════════════════════════
 if page == "🏠 Home":
 
-    # Hero banner
     st.markdown(f"""
     <div style='background: linear-gradient(135deg, {SAF_DARK_GREEN} 0%, {SAF_GREEN} 100%);
                 padding: 36px 32px; border-radius: 16px; margin-bottom: 28px;
@@ -413,21 +359,18 @@ if page == "🏠 Home":
     </div>
     """, unsafe_allow_html=True)
 
-    # KPI row
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Transactions Analysed", "120,000")
-    c2.metric("Fraud Cases",           "3,510",    delta="2.93% of total", delta_color="inverse")
-    c3.metric("XGBoost Precision",     "1.00",     delta="Zero false positives")
-    c4.metric("WoE Recall",            "0.69",     delta="Highest fraud catch rate")
-    c5.metric("All Models AUC",        "~0.83",    delta="Strong separation")
+    c2.metric("Fraud Cases",           "3,510",  delta="2.93% of total", delta_color="inverse")
+    c3.metric("XGBoost Precision",     "1.00",   delta="Zero false positives")
+    c4.metric("WoE Recall",            "0.69",   delta="Highest fraud catch rate")
+    c5.metric("All Models AUC",        "~0.83",  delta="Strong separation")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # What is this tool
     st.markdown(f'<div class="section-header">What does this tool do?</div>', unsafe_allow_html=True)
 
     col_a, col_b, col_c = st.columns(3)
-
     with col_a:
         st.markdown(f"""
         <div class="stat-card">
@@ -440,7 +383,6 @@ if page == "🏠 Home":
             </p>
         </div>
         """, unsafe_allow_html=True)
-
     with col_b:
         st.markdown(f"""
         <div class="stat-card">
@@ -453,7 +395,6 @@ if page == "🏠 Home":
             </p>
         </div>
         """, unsafe_allow_html=True)
-
     with col_c:
         st.markdown(f"""
         <div class="stat-card">
@@ -468,12 +409,9 @@ if page == "🏠 Home":
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # The two-layer system explained
     st.markdown(f'<div class="section-header">How the Two-Layer System Works</div>', unsafe_allow_html=True)
 
     lay1, lay2 = st.columns(2)
-
     with lay1:
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, #FFF0F0, #FFE5E5);
@@ -486,12 +424,10 @@ if page == "🏠 Home":
                 <b>Precision:</b> 1.00 — zero false positives<br>
                 <b>Use case:</b> Automated transaction blocking<br><br>
                 When XGBoost flags a transaction, block it immediately.
-                Every single flag is a confirmed fraud case. No innocent
-                customer will ever be wrongly stopped.
+                Every single flag is a confirmed fraud case.
             </p>
         </div>
         """, unsafe_allow_html=True)
-
     with lay2:
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, {SAF_LIGHT}, #E8F5E9);
@@ -504,15 +440,12 @@ if page == "🏠 Home":
                 <b>Recall:</b> 0.69 — catches the most fraud<br>
                 <b>Use case:</b> CBK compliance and audit trails<br><br>
                 When a regulator asks why a transaction was blocked,
-                the scorecard explains every contributing feature
-                in plain language.
+                the scorecard explains every contributing feature.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Business context
     st.markdown(f"""
     <div class="info-box">
         <b>Why this matters:</b> The CBK's 2024 Financial Sector Stability Report documented
@@ -523,9 +456,7 @@ if page == "🏠 Home":
     """, unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════════════════════
 # PAGE: CHECK A TRANSACTION
-# ═══════════════════════════════════════════════════════════
 elif page == "🔍 Check a Transaction":
 
     st.markdown(f"""
@@ -541,7 +472,7 @@ elif page == "🔍 Check a Transaction":
         <b>XGBoost Layer:</b> This model has perfect Precision (1.00).
         Every transaction it flags as fraud is a genuine fraud case.
         Zero innocent customers have been wrongly blocked in testing.
-        Use the sidebar quick test buttons to try a pre-built example.
+        Use the <b>Quick Test</b> buttons in the sidebar to try a pre-built example.
     </div>
     """, unsafe_allow_html=True)
 
@@ -567,22 +498,22 @@ elif page == "🔍 Check a Transaction":
 
         st.markdown(f'<div class="section-header">📱 Transaction Context</div>', unsafe_allow_html=True)
 
-        txn_type   = st.selectbox("Transaction Type",
-                        ["peer", "till", "paybill"],
-                        index=["peer","till","paybill"].index(d_txn),
-                        help="peer = person to person | till = business till | paybill = bill payment")
-        device     = st.selectbox("Device Type",
-                        ["smartphone", "feature"],
-                        index=["smartphone","feature"].index(d_device),
-                        help="smartphone = Android/iOS | feature = basic USSD phone")
-        region     = st.selectbox("Region",
-                        ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"],
-                        index=["Nairobi","Mombasa","Kisumu","Nakuru","Eldoret"].index(d_region))
-        day        = st.selectbox("Day of Week",
-                        ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
-                        index=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].index(d_day))
+        txn_type = st.selectbox("Transaction Type",
+                     ["peer", "till", "paybill"],
+                     index=["peer","till","paybill"].index(d_txn),
+                     help="peer = person to person | till = business till | paybill = bill payment")
+        device   = st.selectbox("Device Type",
+                     ["smartphone", "feature"],
+                     index=["smartphone","feature"].index(d_device),
+                     help="smartphone = Android or iOS | feature = basic USSD phone")
+        region   = st.selectbox("Region",
+                     ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"],
+                     index=["Nairobi","Mombasa","Kisumu","Nakuru","Eldoret"].index(d_region))
+        day      = st.selectbox("Day of Week",
+                     ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+                     index=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].index(d_day))
 
-        check_btn  = st.button("🔍 Check Transaction", type="primary", use_container_width=True)
+        check_btn = st.button("🔍 Check Transaction", type="primary", use_container_width=True)
 
     with col_result:
         st.markdown(f'<div class="section-header">🎯 Detection Result</div>', unsafe_allow_html=True)
@@ -594,9 +525,9 @@ elif page == "🔍 Check a Transaction":
                 hour, txn_type, device, region, day
             )
 
-            scale_cols = ['amount','sender_balance_before','sender_balance_after',
-                          'receiver_balance_before','receiver_balance_after',
-                          'balance_depletion_rate','sender_balance_ratio']
+            scale_cols = ['amount', 'sender_balance_before', 'sender_balance_after',
+                          'receiver_balance_before', 'receiver_balance_after',
+                          'balance_depletion_rate', 'sender_balance_ratio']
             X_scaled = X_input.copy()
             X_scaled[scale_cols] = scaler.transform(X_input[scale_cols])
 
@@ -633,18 +564,21 @@ elif page == "🔍 Check a Transaction":
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Probability gauge bar
             st.markdown("<br>", unsafe_allow_html=True)
+
+            # Probability gauge
             fig, ax = plt.subplots(figsize=(7, 1.5))
             bar_color = SAF_RED if prediction == 1 else SAF_GREEN
-            ax.barh(['Risk Level'], [pct],        color=bar_color, alpha=0.85, height=0.5)
-            ax.barh(['Risk Level'], [100 - pct],  left=[pct], color='#E0E0E0', alpha=0.5, height=0.5)
+            ax.barh(['Risk Level'], [pct],       color=bar_color, alpha=0.85, height=0.5)
+            ax.barh(['Risk Level'], [100 - pct], left=[pct], color='#E0E0E0', alpha=0.5, height=0.5)
             ax.axvline(x=50, color='orange', linestyle='--', linewidth=1.5)
             ax.set_xlim(0, 100)
             ax.set_xlabel('Fraud Probability (%)')
-            ax.text(min(pct / 2, 45), 0, f'{pct}%',
+            label_x = max(pct / 2, 5)
+            ax.text(min(label_x, 45), 0, f'{pct}%',
                     ha='center', va='center', color='white', fontweight='bold', fontsize=13)
-            ax.set_title('Fraud Probability Score', fontsize=11, color=SAF_DARK_GREEN, fontweight='bold')
+            ax.set_title('Fraud Probability Score', fontsize=11,
+                         color=SAF_DARK_GREEN, fontweight='bold')
             fig.patch.set_facecolor('white')
             plt.tight_layout()
             st.pyplot(fig)
@@ -656,8 +590,9 @@ elif page == "🔍 Check a Transaction":
                         unsafe_allow_html=True)
             st.markdown("""
             <p style='color:#555; font-size:13px; margin-bottom:12px;'>
-                These four engineered features are what the model actually looks at.
-                They capture the account drainage pattern of a SIM swap attack.
+                These four engineered features capture the account drainage
+                pattern of a SIM swap attack. The model uses these to make
+                its decision.
             </p>
             """, unsafe_allow_html=True)
 
@@ -693,9 +628,7 @@ elif page == "🔍 Check a Transaction":
             """, unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════════════════════
 # PAGE: SCORECARD AUDIT
-# ═══════════════════════════════════════════════════════════
 elif page == "📋 Scorecard Audit":
 
     st.markdown(f"""
@@ -709,10 +642,8 @@ elif page == "📋 Scorecard Audit":
     st.markdown(f"""
     <div class="info-box">
         <b>WoE Scorecard Layer:</b> Unlike XGBoost, every decision this model makes
-        can be explained to a regulator. It converts each feature into a Weight of
-        Evidence score and shows exactly which values contributed to the fraud flag.
-        Higher Recall (0.69) means it catches more fraud than XGBoost, at the cost
-        of more false alarms (Precision: 0.23).
+        can be explained to a regulator. Higher Recall (0.69) means it catches more
+        fraud than XGBoost, at the cost of more false alarms (Precision: 0.23).
     </div>
     """, unsafe_allow_html=True)
 
@@ -723,12 +654,15 @@ elif page == "📋 Scorecard Audit":
     with col_woe_form:
         st.markdown(f'<div class="section-header">💳 Transaction Inputs</div>', unsafe_allow_html=True)
 
-        woe_amount   = st.number_input("Amount (KES)", min_value=1.0, max_value=500000.0,
-                            value=d_amount, step=100.0, key="woe_amount")
-        woe_s_before = st.number_input("Sender Balance Before (KES)", min_value=0.0,
-                            max_value=1000000.0, value=d_s_before, step=500.0, key="woe_sb")
-        woe_s_after  = st.number_input("Sender Balance After (KES)", min_value=0.0,
-                            max_value=1000000.0, value=d_s_after, step=500.0, key="woe_sa")
+        woe_amount   = st.number_input("Amount (KES)",
+                           min_value=1.0, max_value=500000.0,
+                           value=d_amount, step=100.0, key="woe_amount")
+        woe_s_before = st.number_input("Sender Balance Before (KES)",
+                           min_value=0.0, max_value=1000000.0,
+                           value=d_s_before, step=500.0, key="woe_sb")
+        woe_s_after  = st.number_input("Sender Balance After (KES)",
+                           min_value=0.0, max_value=1000000.0,
+                           value=d_s_after, step=500.0, key="woe_sa")
 
         woe_btn = st.button("📋 Run Scorecard Audit", type="primary", use_container_width=True)
 
@@ -745,23 +679,16 @@ elif page == "📋 Scorecard Audit":
     with col_woe_result:
         st.markdown(f'<div class="section-header">🎯 Scorecard Result</div>', unsafe_allow_html=True)
 
-    if woe_btn:
-        woe_is_high  = 1 if woe_amount > 3800 else 0
-        woe_ratio    = woe_s_after / (woe_s_before + 1)
+        if woe_btn:
+            woe_is_high = 1 if woe_amount > 3800 else 0
+            woe_ratio   = woe_s_after / (woe_s_before + 1)
 
-        woe_input = prepare_woe_input(woe_amount, woe_s_after, woe_ratio, woe_is_high)
+            woe_input = prepare_woe_input(woe_amount, woe_s_after, woe_ratio, woe_is_high)
 
-            if 'is_balance_wipeout' in woe_input.columns:
-                woe_input = woe_input.drop(columns=['is_balance_wipeout'])
+            woe_prob = woe_model.predict_proba(woe_input)[0][1]
+            woe_pred = woe_model.predict(woe_input)[0]
+            woe_pct  = round(woe_prob * 100, 1)
 
-            # DEBUG — show what columns and values are going into the model
-            st.write("Columns going into WoE model:", woe_input.columns.tolist())
-            st.write("Values:", woe_input.values)
-            st.write("Model expects:", woe_model.feature_names_in_.tolist())
-
-            woe_prob     = woe_model.predict_proba(woe_input)[0][1]
-            woe_pred     = woe_model.predict(woe_input)[0]
-            woe_pct      = round(woe_prob * 100, 1)
             if woe_pred == 1:
                 st.markdown(f"""
                 <div class="fraud-alert">
@@ -791,15 +718,13 @@ elif page == "📋 Scorecard Audit":
                 </div>
                 """, unsafe_allow_html=True)
 
-            # WoE score breakdown
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f'<div class="section-header">📊 Feature Score Breakdown</div>',
                         unsafe_allow_html=True)
             st.markdown("""
             <p style='color:#555; font-size:13px; margin-bottom:12px;'>
-                This table shows exactly why the model made its decision.
-                Each row is one feature. The WoE Score shows how much that
-                feature contributed to the fraud flag.
+                Each row is one feature. Positive WoE pushed toward fraud.
+                Negative WoE pushed toward legitimate.
             </p>
             """, unsafe_allow_html=True)
 
@@ -809,16 +734,17 @@ elif page == "📋 Scorecard Audit":
             woe_display['Signal'] = woe_display['WoE Score'].apply(
                 lambda x: '🔴 Fraud signal' if x > 0 else '🟢 Legitimate signal'
             )
-            woe_display['Feature'] = woe_display['Feature'].str.replace('_woe', '').str.replace('_', ' ').str.title()
+            woe_display['Feature'] = (woe_display['Feature']
+                                      .str.replace('_woe', '', regex=False)
+                                      .str.replace('_', ' ', regex=False)
+                                      .str.title())
             st.dataframe(woe_display, use_container_width=True, hide_index=True)
 
-            # Coefficients chart
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f'<div class="section-header">⚖️ Model Coefficients</div>',
                         unsafe_allow_html=True)
             st.markdown("""
             <p style='color:#555; font-size:13px; margin-bottom:12px;'>
-                These coefficients show how much weight the model gives each feature.
                 A longer red bar means that feature pushes more strongly toward fraud.
             </p>
             """, unsafe_allow_html=True)
@@ -856,9 +782,7 @@ elif page == "📋 Scorecard Audit":
             """, unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════════════════════
 # PAGE: MODEL RESULTS
-# ═══════════════════════════════════════════════════════════
 elif page == "📊 Model Results":
 
     st.markdown(f"""
@@ -871,8 +795,7 @@ elif page == "📊 Model Results":
 
     st.markdown(f"""
     <div class="info-box">
-        All four models achieve nearly identical AUC-ROC scores (~0.83), meaning they
-        all have the same overall ability to separate fraud from legitimate transactions.
+        All four models achieve nearly identical AUC-ROC scores (~0.83).
         The difference is entirely in <b>how</b> they flag fraud, not whether they can detect it.
         No single model wins on every metric. That is why both XGBoost and the WoE Scorecard
         are deployed together.
@@ -880,27 +803,22 @@ elif page == "📊 Model Results":
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Results table
     st.markdown(f'<div class="section-header">📋 Full Comparison Scorecard</div>',
                 unsafe_allow_html=True)
 
     comp_df = pd.DataFrame({
-        'Model':     ['Logistic Regression', 'WoE Scorecard', 'LightGBM', 'XGBoost'],
-        'Type':      ['Baseline', 'Regulatory', 'High Performance', 'Primary'],
-        'Precision': [0.5219, 0.2280, 0.9603, 1.0000],
-        'Recall':    [0.6624, 0.6852, 0.6538, 0.6553],
-        'F1-Score':  [0.5838, 0.3421, 0.7780, 0.7917],
-        'AUC-ROC':   [0.8343, 0.8250, 0.8267, 0.8303],
-        'False Positives': [426, 1629, 19, 0],
-        'Fraud Caught':    [465, 481,  459, 460],
+        'Model':           ['Logistic Regression', 'WoE Scorecard', 'LightGBM', 'XGBoost'],
+        'Type':            ['Baseline', 'Regulatory', 'High Performance', 'Primary'],
+        'Precision':       [0.5219, 0.2280, 0.9603, 1.0000],
+        'Recall':          [0.6624, 0.6852, 0.6538, 0.6553],
+        'F1-Score':        [0.5838, 0.3421, 0.7780, 0.7917],
+        'AUC-ROC':         [0.8343, 0.8250, 0.8267, 0.8303],
+        'False Positives': [426,    1629,   19,     0],
+        'Fraud Caught':    [465,    481,    459,    460],
     })
 
     def highlight_best(s):
-        if s.name in ['Precision', 'F1-Score', 'AUC-ROC', 'Fraud Caught']:
-            return ['background-color:#E8F5E9; font-weight:bold;'
-                    if v == s.max() else '' for v in s]
-        if s.name == 'Recall':
+        if s.name in ['Precision', 'F1-Score', 'AUC-ROC', 'Fraud Caught', 'Recall']:
             return ['background-color:#E8F5E9; font-weight:bold;'
                     if v == s.max() else '' for v in s]
         if s.name == 'False Positives':
@@ -919,22 +837,17 @@ elif page == "📊 Model Results":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Charts
     col_ch1, col_ch2 = st.columns(2)
+    models_s = ['LR Baseline', 'WoE Scorecard', 'LightGBM', 'XGBoost']
+    x        = np.arange(len(models_s))
+    w        = 0.35
+    clrs     = ['#888888', SAF_DARK_GREEN, '#FFA000', SAF_RED]
 
     with col_ch1:
-        st.markdown(f'<div class="section-header">Precision vs Recall</div>',
-                    unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">Precision vs Recall</div>', unsafe_allow_html=True)
         fig3, ax3 = plt.subplots(figsize=(7, 4))
-        models_s  = ['LR Baseline', 'WoE Scorecard', 'LightGBM', 'XGBoost']
-        x         = np.arange(len(models_s))
-        w         = 0.35
-        clrs      = ['#888888', SAF_DARK_GREEN, '#FFA000', SAF_RED]
-
-        ax3.bar(x - w/2, comp_df['Precision'], w, label='Precision',
-                color=clrs, alpha=0.9, edgecolor='white')
-        ax3.bar(x + w/2, comp_df['Recall'],    w, label='Recall',
-                color=clrs, alpha=0.45, edgecolor='white')
+        ax3.bar(x - w/2, comp_df['Precision'], w, color=clrs, alpha=0.9,  edgecolor='white')
+        ax3.bar(x + w/2, comp_df['Recall'],    w, color=clrs, alpha=0.45, edgecolor='white')
         ax3.axhline(y=0.80, color='black', linestyle='--', linewidth=0.8, alpha=0.4)
         ax3.set_xticks(x)
         ax3.set_xticklabels(models_s, rotation=10, fontsize=9)
@@ -952,7 +865,6 @@ elif page == "📊 Model Results":
         st.markdown(f'<div class="section-header">False Positives vs Fraud Caught</div>',
                     unsafe_allow_html=True)
         fig4, ax4 = plt.subplots(figsize=(7, 4))
-
         ax4.bar(x - w/2, comp_df['False Positives'], w,
                 label='False Positives (innocent customers flagged)',
                 color=SAF_RED, alpha=0.75, edgecolor='white')
@@ -963,7 +875,7 @@ elif page == "📊 Model Results":
         ax4.set_xticklabels(models_s, rotation=10, fontsize=9)
         ax4.set_ylabel('Number of Transactions')
         ax4.legend(fontsize=9)
-        ax4.set_title('False Positives vs Fraud Caught (out of 24,000 test transactions)',
+        ax4.set_title('False Positives vs Fraud Caught\n(out of 24,000 test transactions)',
                       fontsize=10, color=SAF_DARK_GREEN, fontweight='bold')
         fig4.patch.set_facecolor('white')
         plt.tight_layout()
@@ -971,13 +883,10 @@ elif page == "📊 Model Results":
         plt.close()
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Deployment recommendation
     st.markdown(f'<div class="section-header">🚀 Deployment Recommendation</div>',
                 unsafe_allow_html=True)
 
     d1, d2 = st.columns(2)
-
     with d1:
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, #FFF0F0, #FFE5E5);
@@ -990,7 +899,6 @@ elif page == "📊 Model Results":
             </p>
         </div>
         """, unsafe_allow_html=True)
-
     with d2:
         st.markdown(f"""
         <div style='background: linear-gradient(135deg, {SAF_LIGHT}, #E8F5E9);
