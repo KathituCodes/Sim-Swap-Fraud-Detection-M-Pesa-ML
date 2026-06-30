@@ -201,10 +201,10 @@ def load_legit():
 # LOAD MODELS
 @st.cache_resource
 def load_models():
-    xgb_model = joblib.load("xgboost_fraud_model.pkl")
-    scaler    = joblib.load("scaler.pkl")
-    woe_model = joblib.load("woe_scorecard_model.pkl")
-    with open("woe_bins.pkl", "rb") as f:
+    xgb_model = joblib.load("models/xgboost_fraud_model.pkl")
+    scaler = joblib.load("models/scaler.pkl")
+    woe_model = joblib.load("models/woe_scorecard_model.pkl")
+    with open("models/woe_bins.pkl", "rb") as f:
         woe_bins = pickle.load(f)
     return xgb_model, scaler, woe_model, woe_bins
 
