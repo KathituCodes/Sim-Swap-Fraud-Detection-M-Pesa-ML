@@ -5,13 +5,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-"""
-M-Pesa SIM Swap Fraud Detection Dashboard
-Design : Inspired by the My Safaricom App visual identity
-Author : Urbanus Kathitu (Kat.Codes)
-GitHub : github.com/KathituCodes/SIM-Swap-Fraud-Detection-M-Pesa-ML
-"""
-
 # PAGE CONFIG — must be the very first Streamlit call
 st.set_page_config(
     page_title="M-Pesa Fraud Detector",
